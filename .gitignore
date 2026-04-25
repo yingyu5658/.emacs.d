@@ -1,0 +1,9 @@
+elpa/
+auto-save-list/
+snippets/
+eln-cache/
+recentf.eld
+places.eld
+
+*.elc
+*.eln
