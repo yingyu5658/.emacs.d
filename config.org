@@ -1,0 +1,548 @@
+#+title: config
+#+property: header-args :tangle yes
+
+* 编辑相关
+** Evil
+#+begin_src emacs-lisp
+  ;; -*- lexical-binding: t; -*-
+  (use-package evil
+    :init
+    (setq evil-want-keybinding nil
+  	evil-want-C-u-scroll t)
+    :config
+    (evil-mode)
+    :ensure t)
+
+  (use-package evil-collection
+    :after evil
+    :ensure t
+    :config
+    (evil-collection-init))
+
+#+end_src
+** olivetti
+#+begin_src emacs-lisp
+  (use-package olivetti)
+#+end_src
+** yasnippet
+#+begin_src emacs-lisp
+  (use-package yasnippet
+    :ensure t
+    :config
+    (yas-global-mode 1))
+#+end_src
+** ivy
+#+begin_src emacs-lisp
+  (use-package ivy
+    :ensure t
+    :init
+    (ivy-mode 1)
+    (counsel-mode 1)
+    :config
+    (setq ivy-use-selectable-prompt t)
+    (setq ivy-use-preview t)
+    (setq ivy-fixed-height-minibuffer t)
+    (setq ivy-use-preview t)
+    (setq ivy-use-virtual-buffers t)
+    (setq search-default-mode #'char-fold-to-regexp)
+    (setq ivy-count-format "(%d/%d) ")
+    (setq ivy-initial-inputs-alist nil)  ;; 不预设初始输入
+    (setq ivy-use-selectable-prompt t)   ;; 允许选择提示
+    :bind
+    (("C-s" . 'swiper)
+     ("C-x b" . 'ivy-switch-buffer)
+     ("C-c v" . 'ivy-push-view)
+     ("C-c s" . 'ivy-switch-view)
+     ("C-c V" . 'ivy-pop-view)
+     ("C-x C-@" . 'counsel-mark-ring); 在某些终端上 C-x C-SPC 会被映射为 C-x C-@，比如在 macOS 上，所以要手动设置
+     ("C-x C-SPC" . 'counsel-mark-ring)
+     :map minibuffer-local-map
+     ("C-r" . counsel-minibuffer-history)))
+
+  ;; (use-package ivy-posframe
+  ;;   :ensure t
+  ;;   :config
+  ;;   (ivy-posframe-mode t))
+
+  (use-package ivy-rich
+    :ensure t
+    :config
+    (ivy-rich-mode t))
+#+end_src
+** company-mode
+#+begin_src emacs-lisp
+  ;; 启用 company-mode 全局补全
+  (use-package company
+    :ensure t
+    :config
+    (setq company-idle-delay 0.0
+  	company-minimum-prefix-length 1)
+    (global-company-mode)
+
+    (with-eval-after-load 'company
+      ;; 补全列表背景
+      (set-face-attribute 'company-tooltip nil
+  			:foreground "white" :background "gray20")
+      ;; 选中项背景
+      (set-face-attribute 'company-tooltip-selection nil
+  			:foreground "blue" :background "gray20")
+      ;; 输入前缀高亮
+      (set-face-attribute 'company-tooltip-common nil
+  			:foreground "orange" :background "gray20")
+      ;; 右侧注释/类型
+      (set-face-attribute 'company-tooltip-annotation nil
+  			:foreground "cyan" :background "gray20")))
+#+end_src
+** LSP
+
+#+begin_src emacs-lisp
+  (use-package lsp-mode
+    :ensure t
+    :init
+    (setq read-process-output-max (* 1024 1024))
+    :hook (
+  	 (go-mode .lsp)
+  	 (css-mode . lsp)
+  	 (html-mode . lsp))
+    :config
+    (setq lsp-enable-on-type-formatting nil))
+
+  (use-package lsp-ui
+    :ensure t
+    :commands lsp-ui-mode)
+#+end_src
+** clang-format
+#+begin_src emacs-lisp
+  (use-package clang-format
+    :ensure t
+    :bind
+    (:map c-mode-base-map
+  	("C-c C-f" . clang-format-buffer))
+    :config
+    (setq clang-format-executable (executable-find "clang-format")))
+#+end_src
+** sis
+
+#+begin_src emacs-lisp
+  (use-package sis
+    :config
+    (sis-ism-lazyman-config "1" "2" 'fcitx5)
+    (sis-global-cursor-color-mode t)
+    ;; 启用 /respect/ 模式
+    (sis-global-respect-mode t)
+    ;; 为所有缓冲区启用 /context/ 模式
+    (sis-global-context-mode t)
+    ;; 为所有缓冲区启用 /inline english/ 模式
+    (sis-global-inline-mode t)
+    (with-eval-after-load 'evil
+      ;; 强制在进入插入模式时触发 sis 的恢复逻辑
+      ;;(add-hook 'evil-insert-state-entry-hook #'sis-context-restore)
+  					; (add-hook 'evil-insert-state-entry-hook #'sis-set-chinese))
+      ))
+#+end_src
+
+* 邮件
+** mu4e
+这个东西的配置实在是太庞大了，懒得细拆了。
+#+begin_src emacs-lisp
+  (require 'smtpmail)
+
+  (add-to-list 'load-path "/usr/share/emacs/site-lisp/elpa-src/mu4e-1.8.14")
+
+  (setq gnutls-algorithm-priority "NORMAL:%COMPAT")
+
+  (defun mu4e-goodies~break-cjk-word (word)
+    "Break CJK word into list of bi-grams like: 我爱你 -> 我爱 爱你"
+    (if (or (<= (length word) 2)
+            (equal (length word) (string-bytes word)))
+        word
+      (let ((pos nil)
+            (char-list nil)
+            (br-word nil))
+        (if (setq pos (string-match ":" word))
+            (concat (substring word 0 (+ 1 pos)) 
+                    (mu4e-goodies~break-cjk-word (substring word (+ 1 pos))))
+          (if (memq 'ascii (find-charset-string word))
+              word
+            (progn 
+              (setq char-list (split-string word "" t))
+              (while (cdr char-list)
+                (setq br-word (concat br-word (concat (car char-list) (cadr char-list)) " "))
+                (setq char-list (cdr char-list)))
+              br-word))))))
+
+  (defun mu4e-goodies~break-cjk-query (expr)
+    "Break CJK strings into bi-grams in query."
+    (let ((word-list (split-string expr " " t))
+          (new ""))
+      (dolist (word word-list new)
+        (setq new (concat new (mu4e-goodies~break-cjk-word word) " ")))))
+
+  (setq mu4e-query-rewrite-function 'mu4e-goodies~break-cjk-query)
+
+  (use-package mu4e
+    :ensure nil
+    :if (executable-find "mu")
+    :commands (mu4e)
+    :bind (:map mu4e-view-mode-map
+                ("9" . scroll-down-command)
+                ("0" . scroll-up-command)
+                :map mu4e-search-minor-mode-map
+                ("/" . mu4e-search-maildir)
+                :map mu4e-main-mode-map
+                ("g" . mu4e-update-mail-and-index)
+                :map mu4e-headers-mode-map
+                ("<backspace>" . scroll-down-command)
+                ("j" . mu4e-headers-next)
+                ("k" . mu4e-headers-prev)
+                ("r" . mu4e-headers-mark-for-read)
+                ("!" . mu4e-headers-flag-all-read)
+                ("f" . mu4e-headers-mark-for-flag))
+    
+    :custom
+    (mu4e-headers-fields '((:human-date . 10)
+                           (:flags . 6)
+                           (:from-or-to . 22)
+                           (:thread-subject . nil)))
+    (mu4e-view-fields '(:from :to :cc :bcc :subject :flags
+  			    :date :maildir :mailing-list :tags))
+    (mu4e-modeline-show-global nil)
+    (mu4e-hide-index-messages t)
+    
+    :init
+    (setq user-mail-address "im@verdant.ee"
+          user-full-name "Verdant"
+          mu4e-debug t)
+    
+    (setq message-send-mail-function 'sendmail-send-it
+          sendmail-program "/usr/bin/msmtp"
+          mail-specify-envelope-from t
+          mail-envelope-from 'header)
+    
+    (setq message-citation-line-format "\nOn %a, %b %d, %Y at %r %z, %N wrote:\n"
+          message-citation-line-function 'message-insert-formatted-citation-line
+          mm-discouraged-alternatives '("text/html" "text/richtext")
+          gnus-article-time-format "%a, %Y-%m-%d %T %z"
+          gnus-article-date-headers '(user-defined original))
+    
+    :config
+    (require 'mu4e-contrib)
+    
+    (setq mail-user-agent 'mu4e-user-agent)
+    
+    (setq mu4e-contexts
+          (list
+           (make-mu4e-context
+            :name "Verdant"
+            :match-func (lambda (msg)
+                          (when msg
+                            (string-prefix-p "/ljc" (mu4e-message-field msg :maildir))))
+            :vars '((mu4e-sent-folder . "/Verdant/Sent")
+                    (mu4e-trash-folder . "/Verdant/Trash")
+                    (mu4e-refile-folder . "/Verdant/Archive")
+                    (mu4e-drafts-folder . "/Verdant/Drafts")
+                    (user-mail-address . "im@verdant.ee")))))
+    
+    (setq mu4e-compose-complete-only-personal t
+          mu4e-view-show-addresses t
+          mu4e-view-show-images nil
+          mu4e-attachment-dir "~/Downloads"
+          mu4e-sent-messages-behavior 'sent
+          mu4e-context-policy 'pick-first
+          mu4e-compose-context-policy 'ask-if-none
+          mu4e-compose-dont-reply-to-self t
+          mu4e-confirm-quit nil
+          mu4e-headers-date-format "%+4Y-%m-%d"
+          mu4e-view-html-plaintext-ratio-heuristic most-positive-fixnum
+          mu4e-update-interval (* 30 60)
+          mu4e-get-mail-command "true"
+          mu4e-compose-format-flowed t
+          mu4e-completing-read-function 'ido-completing-read)
+    
+    (setq mu4e-bookmarks '((:name "All Inbox"
+  				:query "maildir:/Verdant/INBOX"
+  				:key ?i)
+                           (:name "Unread messages"
+  				:query "flag:unread AND NOT flag:trashed"
+  				:key ?u)
+                           (:name "Today's messages"
+  				:query "date:today..now AND NOT flag:trashed"
+  				:key ?t)
+                           (:name "Last 7 days"
+  				:query "date:7d..now AND NOT flag:trashed"
+  				:hide-unread t
+  				:key ?w)
+                           (:name "Flagged"
+  				:query "flag:flagged"
+  				:key ?f)
+                           (:name "Sent"
+  				:query "maildir:/Verdant/Sent"
+  				:key ?s)))
+    
+    (add-to-list 'mu4e-view-actions '("browser" . mu4e-action-view-in-browser) t)
+    
+    (defun my/mu4e-pre-update-hook ()
+      (let ((inhibit-message t))
+        (message "Update and index mu4e at %s" (format-time-string "%D %-I:%M %p"))))
+    
+    (defun my/mu4e-stop-update-task ()
+      (interactive)
+      (when mu4e--update-timer
+        (cancel-timer mu4e--update-timer)
+        (setq mu4e--update-timer nil)))
+    
+    (setq mu4e-update-pre-hook 'my/mu4e-pre-update-hook)
+    
+    (add-to-list 'mu4e-view-fields :bcc))
+#+end_src
+* 外观和 UI
+** ace-window
+#+begin_src emacs-lisp
+  (use-package ace-window
+    :ensure t
+    :bind
+    (("C-x o" . ace-window)))
+#+end_src
+** dashboard
+#+begin_src emacs-lisp
+  (use-package dashboard
+    :ensure t
+    :config
+    (setq dashboard-startup-banner 'logo
+  	dashboard-banner-logo-title "Welcome to Verdant's Emacverse!!!"
+  	dashboard-center-content t
+  	dashboard-set-heading-icons t
+  	dashboard-items '((recents  . 10)
+                            (bookmarks . 5))
+  	dashboard-footer-messages '("verdant.el"))
+
+    ;; 核心三件套
+    (setq initial-buffer-choice (lambda () (get-buffer-create "*dashboard*")))
+    (dashboard-setup-startup-hook)
+    (add-hook 'after-init-hook #'dashboard-open t))
+#+end_src
+
+** 主题
+#+begin_src emacs-lisp
+  (setq custom-safe-themes t)
+  (load-theme 'doom-Iosvkem)
+#+end_src
+
+** 窗口大小
+#+begin_src emacs-lisp
+  (set-face-attribute
+   'default nil
+   :height 120)
+#+end_src
+
+** 新窗口平均其他左右窗口
+#+begin_src emacs-lisp
+  (setq window-combination-resize t)
+#+end_src
+
+** 光标拉伸到字符宽度
+#+begin_src emacs-lisp
+  (setq x-stretch-cursor t)
+#+end_src
+
+* MIT-Scheme
+#+begin_src emacs-lisp
+  (setq scheme-program-name "mit-scheme")
+
+  (require 'cmuscheme)
+
+  (global-set-key (kbd "C-c C-e") 'scheme-send-last-sexp)   ; 求值前一个表达式
+  (global-set-key (kbd "C-c C-r") 'scheme-send-region)     ; 求值选中区域
+  (global-set-key (kbd "C-c C-l") 'scheme-load-file)       ; 加载整个文件
+  (global-set-key (kbd "C-c C-z") 'run-scheme)             ; 启动/切换 REPL
+
+  (add-to-list 'auto-mode-alist '("\\.scm\\'" . scheme-mode))
+#+end_src
+* Markdown
+** 优化环境
+#+begin_src emacs-lisp
+  (defun setup-markdown-writing-environment ()
+    "为 Markdown 写作优化的环境：开启 Olivetti，关闭行号。"
+    (interactive)
+    (variable-pitch-mode 1)
+    (display-line-numbers-mode -1)
+    (pixel-scroll-precision-mode 1)
+    (olivetti-mode))
+
+  (add-hook 'markdown-mode-hook
+            (lambda ()
+              ;; 取消 Evil 的 TAB 绑定，使用 markdown-cycle
+              (define-key evil-normal-state-local-map (kbd "TAB") 'markdown-cycle)
+              (define-key evil-insert-state-local-map (kbd "TAB") 'indent-for-tab-command)))
+#+end_src
+* Dired
+
+#+begin_src emacs-lisp
+  (setq dired-recursive-copies 'always)
+  (setq dired-recursive-deletes 'always)
+  (setq dired-dwim-target t)
+
+  (put 'dired-find-alternate-file 'disabled nil)
+  (with-eval-after-load 'dired
+    (define-key dired-mode-map (kbd "RET") 'dired-find-alternate-file)
+    (define-key dired-mode-map (kbd "^") (lambda () (interactive) (find-alternate-file ".."))))  ; was dired-up-directory)
+
+  (setq dired-dwim-target t)
+
+  ;; dired-sort
+  (defun dired-sort-size ()
+    "Dired sort by size."
+    (interactive)
+    (dired-sort-other (concat dired-listing-switches "S")))
+
+  (defun dired-sort-extension ()
+    "Dired sort by extension."
+    (interactive)
+    (dired-sort-other (concat dired-listing-switches "X")))
+
+  (defun dired-sort-ctime ()
+    "Dired sort by create time."
+    (interactive)
+    (dired-sort-other (concat dired-listing-switches "ct")))
+
+  (defun dired-sort-utime ()
+    "Dired sort by access time."
+    (interactive)
+    (dired-sort-other (concat dired-listing-switches "ut")))
+
+  (defun dired-sort-time ()
+    "Dired sort by time."
+    (interactive)
+    (dired-sort-other (concat dired-listing-switches "t")))
+
+  (defun dired-sort-name ()
+    "Dired sort by name."
+    (interactive)
+    (dired-sort-other (concat dired-listing-switches "")))
+  ;; 在 Dired 中，按`l`进入文件，按`h`回到上一级目录
+  (add-hook 'evil-mode-hook (lambda ()
+  			    (with-eval-after-load 'dired
+  			      (add-hook 'dired-mode-hook
+  					(lambda ()
+  					  (define-key evil-normal-state-local-map (kbd "h") nil)
+  					  (define-key evil-normal-state-local-map (kbd "l") nil)
+  					  (define-key evil-normal-state-local-map (kbd "h") #'dired-up-directory)
+  					  (define-key evil-normal-state-local-map (kbd "l") #'dired-find-file))))))
+
+  (add-hook 'dired-mode-hook
+            (lambda ()
+  	    (define-key dired-mode-map (kbd "C-b") nil)
+  	    (define-key dired-mode-map (kbd "C-f") nil)
+  	    (define-key dired-mode-map (kbd "C-b") #'dired-up-directory)
+  	    (define-key dired-mode-map (kbd "C-f") #'dired-find-file)))
+
+  (global-set-key (kbd "<escape>") #'my/keyboard-escape-quit)
+
+  (global-auto-revert-mode t) ; 另一程序修改文件让 Emacs 及时刷新 Buffer
+#+end_src
+* Org
+** org-bullets
+#+begin_src emacs-lisp
+  (use-package org-bullets
+    :ensure t
+    :config
+    (setq org-bullets-bullet-list '("☰" "☷" "☯" "☭")))
+  (org-bullets-mode)
+#+end_src
+** 边距
+#+begin_src emacs-lisp
+  (lambda () (progn
+  	     (setq left-margin-width 2)
+  	     (setq right-margin-width 2)
+  	     (set-window-buffer nil (current-buffer))))
+#+end_src
+** 微调
+#+begin_src emacs-lisp
+  (setq org-startup-indented t
+        org-ellipsis "  " ;; folding symbol
+        org-pretty-entities t
+        org-hide-emphasis-markers t
+        ;; show actually italicized text instead of /italicized text/
+        org-agenda-block-separator ""
+        org-fontify-whole-heading-line t
+        org-fontify-done-headline t
+        org-fontify-quote-and-verse-blocks t)
+#+end_src
+* 杂项
+** 自动保存
+#+begin_src emacs-lisp
+  (auto-save-mode 1)
+#+end_src
+** 时间显示
+#+begin_src emacs-lisp
+  (setq ring-bell-function 'ignore
+        custom-safe-themes t ; 禁用非法操作提示
+        cursor-type 'box
+        fringes-outside-margins t
+        display-time-24hr-format t ; 时间使用 24 小时制
+        display-time-day-and-date t ; 时间显示包括日期和时间
+        display-time-interval 60    ; 刷新频率
+        display-time-format "%a %b %-e %H:%M" ; 时间格式
+        scroll-step 1
+        scroll-conservatively 10000)
+  (when (display-graphic-p)
+    (set-frame-size (selected-frame) 143 40))
+  (global-display-line-numbers-mode t)
+  (display-time-mode 1)
+#+end_src
+
+** 关闭 Emacs 时询问
+#+begin_src emacs-lisp
+  (setq confirm-kill-emacs #'yes-or-no-p ; 关闭 Emacs 时询问 y or n
+        auto-save-visited-interval 5
+        native-comp-async-report-warinings-errors nil
+        backup-directory-alist `((".*" . ,temporary-file-directory))
+        auto-save-file-name-transforms `((".*" ,temporary-file-directory t))
+        select-enable-clipboard t
+        select-enable-primary t
+        interprogram-cut-function
+        (lambda (text &optional push)
+  	(let ((process-connection-type nil))
+  	  (let ((proc (start-process "xclip" nil "xclip" "-selection" "clipboard")))
+  	    (process-send-string proc text)
+  	    (process-send-eof proc))))
+        interprogram-paste-function
+        (lambda ()
+  	(shell-command-to-string "xclip -o -selection clipboard")))
+#+end_src
+
+** 删除文件移动到垃圾箱
+#+begin_src emacs-lisp
+  (setq-default delete-by-moving-to-transh t)
+#+end_src
+
+** 快速退出 minibuffer
+#+begin_src emacs-lisp
+  (defun my/keyboard-escape-quit()
+    "快速的 Esc 退出 minibuffer"
+    (interactive)
+    (keyboard-escape-quit))
+
+  (global-set-key (kbd "<escape>") #'my/keyboard-escape-quit)
+#+end_src
+
+** 减轻数括号的痛苦
+#+begin_src emacs-lisp
+  (show-paren-mode 1) ; 减轻数括号的痛苦
+#+end_src
+
+#+begin_src emacs-lisp
+  (provide 'config)
+#+end_src
+
+** 编码风格
+#+begin_src emacs-lisp
+  (setq c-basic-offset 4
+        tab-width 4)
+#+end_src
+
+** counsel
+#+begin_src emacs-lisp
+  (use-package counsel
+    :ensure t)
+#+end_src
